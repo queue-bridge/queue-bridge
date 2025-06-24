@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package queuebridge;
+
+service QueueBridgeBalancer {
+  rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+message SubscribeRequest {
+  string queue_id = 1;
+}
+
+message SubscribeResponse {
+  string message = 1;
+}
+
+message HeartbeatRequest {
+  string queue_id = 1;
+  int64 lag = 2;
+}
+
+message HeartbeatResponse {
+  string status = 1;
+}
