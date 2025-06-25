@@ -42,6 +42,7 @@ impl SubscriberMap {
             }
 
             if let Err(e) = tx.send(Ok(msg)).await {
+                println!("send message failed, {}", e);
                 return Err(Status::internal(format!("send message failed, {}", e)));
             }
 
