@@ -8,7 +8,7 @@ pub mod queuebridge {
 
 use queuebridge::{
     queue_bridge_balancer_server::{QueueBridgeBalancer, QueueBridgeBalancerServer},
-    SubscribeRequest, SubscribeResponse, HeartbeatRequest, HeartbeatResponse,
+    SubscribeRequest, QueueMessage, HeartbeatRequest, HeartbeatResponse,
 };
 
 #[derive(Debug, Default)]
@@ -16,7 +16,7 @@ pub struct MyQueueBridge {}
 
 #[tonic::async_trait]
 impl QueueBridgeBalancer for MyQueueBridge {
-    type SubscribeStream = ReceiverStream<Result<SubscribeResponse, Status>>;
+    type SubscribeStream = ReceiverStream<Result<QueueMessage, Status>>;
 
     async fn subscribe(
         &self,
@@ -29,7 +29,7 @@ impl QueueBridgeBalancer for MyQueueBridge {
 
         tokio::spawn(async move {
             for i in 1..=5 {
-                let msg = SubscribeResponse {
+                let msg = QueueMessage {
                     queue_id: qid.clone(),
                     message: format!("Update {} for queue {}", i, qid).into_bytes(),
                 };
