@@ -68,14 +68,14 @@ impl SubscriberMap {
         return Err(Status::not_found("No available node."));
     }
 
-    pub async fn add_subscriber(&self, queue_id: String, subscriber: Subscriber) {
+    pub async fn add_subscriber(&self, id: String, subscriber: Subscriber) {
         let mut subscribers = self.subscribers.lock().await;
-        subscribers.insert(queue_id, subscriber);
+        subscribers.insert(id, subscriber);
     }
 
-    pub async fn update_heartbeat(&self, queue_id: &str, lag: i64) {
+    pub async fn update_heartbeat(&self, id: &str, lag: i64) {
         let mut subscribers = self.subscribers.lock().await;
-        if let Some(subscriber) = subscribers.get_mut(queue_id) {
+        if let Some(subscriber) = subscribers.get_mut(id) {
             subscriber.last_heartbeat = std::time::SystemTime::now();
             subscriber.lag = lag;
         }
