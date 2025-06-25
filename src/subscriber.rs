@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::{Response, Status};
+use std::time::SystemTime;
 use crate::queuebridge::{QueueMessage, EmptyResponse};
 
 pub struct Subscriber {
     pub tx: tokio::sync::mpsc::Sender<Result<QueueMessage, Status>>,
-    pub last_heartbeat: std::time::SystemTime,
+    pub last_heartbeat: SystemTime,
     pub lag: i64
 }
 
@@ -38,12 +39,33 @@ impl SubscriberMap {
 
         let start = format!("{}_", &queue_id);
         let end = format!("{}`", &queue_id);
+        let mut keys_to_remove: Vec<String> = Vec::new();
         let selected_subscriber = subscribers
             .range(start..end)
-            .min_by_key(|(_, v)| v.lag)
+            .min_by_key(|(k, v)| {
+                if let Ok(duration) = SystemTime::now().duration_since(v.last_heartbeat) {
+                    if duration.as_secs() <= 10 && !v.tx.is_closed() {
+                        return v.lag;
+                    } else {
+                        if duration.as_secs() > 120 || v.tx.is_closed() {
+                            keys_to_remove.push((*k).clone());
+                        }
+                        return i64::MAX;
+                    }
+                } else {
+                    return i64::MAX;
+                }
+            })
             .map(|(k, v)| (k.clone(), v.tx.clone()));
 
         drop(subscribers);
+
+        if !keys_to_remove.is_empty() {
+            let mut subscribers = self.subscribers.lock().await;
+            for k in keys_to_remove {
+                subscribers.remove(&k);
+            }
+        }
 
         if let Some((k, tx)) = selected_subscriber {
             if tx.is_closed() {
