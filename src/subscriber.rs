@@ -80,11 +80,4 @@ impl SubscriberMap {
             subscriber.lag = lag;
         }
     }
-
-    // pub async fn clear_expired(&self, timeout: Duration) {
-    //     let mut subscribers = self.subscribers.lock().await;
-    //     subscribers.retain(|_, subscriber| {
-    //         subscriber.last_heartbeat.elapsed().unwrap() < timeout
-    //     });
-    // }
 }
