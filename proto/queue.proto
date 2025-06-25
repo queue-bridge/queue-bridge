@@ -3,7 +3,7 @@ syntax = "proto3";
 package queuebridge;
 
 service QueueBridgeBalancer {
-  rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
 }
 
@@ -12,7 +12,8 @@ message SubscribeRequest {
 }
 
 message SubscribeResponse {
-  string message = 1;
+  string queue_id = 1;
+  bytes message = 2;
 }
 
 message HeartbeatRequest {
