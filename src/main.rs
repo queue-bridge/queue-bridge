@@ -8,7 +8,7 @@ pub mod queuebridge {
 
 use queuebridge::{
     queue_bridge_balancer_server::{QueueBridgeBalancer, QueueBridgeBalancerServer},
-    SubscribeRequest, QueueMessage, HeartbeatRequest, HeartbeatResponse,
+    EmptyResponse, SubscribeRequest, QueueMessage, HeartbeatRequest,
 };
 
 #[derive(Debug, Default)]
@@ -17,6 +17,15 @@ pub struct MyQueueBridge {}
 #[tonic::async_trait]
 impl QueueBridgeBalancer for MyQueueBridge {
     type SubscribeStream = ReceiverStream<Result<QueueMessage, Status>>;
+
+    async fn push(
+        &self,
+        request: Request<QueueMessage>,
+    ) -> Result<Response<EmptyResponse>, Status> {
+        let msg = request.into_inner();
+        println!("Push called for queue_id={}", msg.queue_id);
+        Ok(Response::new(EmptyResponse {}))
+    }
 
     async fn subscribe(
         &self,
@@ -47,12 +56,10 @@ impl QueueBridgeBalancer for MyQueueBridge {
     async fn heartbeat(
         &self,
         request: Request<HeartbeatRequest>,
-    ) -> Result<Response<HeartbeatResponse>, Status> {
+    ) -> Result<Response<EmptyResponse>, Status> {
         let req = request.into_inner();
         println!("Heartbeat: queue_id={}, lag={}", req.queue_id, req.lag);
-        let status = if req.lag < 100 { "OK" } else { "Lagging" };
-        let reply = HeartbeatResponse { status: status.into() };
-        Ok(Response::new(reply))
+        Ok(Response::new(EmptyResponse {}))
     }
 }
 
