@@ -35,8 +35,7 @@ impl QueueBridgeBalancer for MyQueueBridge {
     ) -> Result<Response<EmptyResponse>, Status> {
         let msg = request.into_inner();
         println!("Push called for queue_id={}", msg.queue_id);
-        self.subscribers.push_message(msg).await;
-        Ok(Response::new(EmptyResponse {}))
+        return self.subscribers.push_message(msg).await;
     }
 
     async fn subscribe(

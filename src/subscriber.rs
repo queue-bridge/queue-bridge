@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tonic::Status;
-use crate::queuebridge::QueueMessage;
+use tonic::{Response, Status};
+use crate::queuebridge::{QueueMessage, EmptyResponse};
 
 pub struct Subscriber {
     pub tx: tokio::sync::mpsc::Sender<Result<QueueMessage, Status>>,
@@ -21,14 +21,32 @@ impl SubscriberMap {
         }
     }
 
-    pub async fn push_message(&self, msg: QueueMessage) {
+    pub async fn push_message(&self, msg: QueueMessage) -> Result<Response<EmptyResponse>, Status> {
         let queue_id = msg.queue_id.clone();
-        let mut subscribers = self.subscribers.lock().await;
-        if let Some(subscribers) = subscribers.get_mut(&queue_id) {
-            if let Err(e) = subscribers.tx.send(Ok(msg)).await {
-                println!("subscriber dropped: {}", e);
-            }
+        let subscribers = self.subscribers.lock().await;
+
+        let start = format!("{}_", &queue_id);
+        let end = format!("{}`", &queue_id);
+        let selected_subscriber = subscribers
+            .range(start..end)
+            .min_by_key(|(_, v)| v.lag)
+            .map(|(k, v)| (k.clone(), v.tx.clone()));
+
+        drop(subscribers);
+
+        if let Some((k, tx)) = selected_subscriber {
+          if tx.is_closed() {
+              let mut subscribers = self.subscribers.lock().await;
+              subscribers.remove(&k);
+              return Err(Status::internal("connection closed."));
+          }
+
+          if let Err(e) = tx.send(Ok(msg)).await {
+              return Err(Status::internal(format!("send message failed, {}", e)));
+          }
         }
+
+        return Err(Status::not_found("No available node."));
     }
 
     pub async fn add_subscriber(&self, queue_id: String, subscriber: Subscriber) {
