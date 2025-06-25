@@ -1,6 +1,5 @@
 use tonic::{transport::Server, Request, Response, Status};
 use tokio_stream::wrappers::ReceiverStream;
-use std::time::Duration;
 
 pub mod queuebridge {
     tonic::include_proto!("queuebridge");
@@ -11,8 +10,20 @@ use queuebridge::{
     EmptyResponse, SubscribeRequest, QueueMessage, HeartbeatRequest,
 };
 
-#[derive(Debug, Default)]
-pub struct MyQueueBridge {}
+mod subscriber;
+use subscriber::{Subscriber, SubscriberMap};
+
+pub struct MyQueueBridge {
+    subscribers: SubscriberMap,
+}
+
+impl Default for MyQueueBridge {
+    fn default() -> Self {
+        Self {
+            subscribers: SubscriberMap::new(),
+        }
+    }
+}
 
 #[tonic::async_trait]
 impl QueueBridgeBalancer for MyQueueBridge {
@@ -24,6 +35,7 @@ impl QueueBridgeBalancer for MyQueueBridge {
     ) -> Result<Response<EmptyResponse>, Status> {
         let msg = request.into_inner();
         println!("Push called for queue_id={}", msg.queue_id);
+        self.subscribers.push(msg).await;
         Ok(Response::new(EmptyResponse {}))
     }
 
@@ -31,24 +43,19 @@ impl QueueBridgeBalancer for MyQueueBridge {
         &self,
         request: Request<SubscribeRequest>,
     ) -> Result<Response<Self::SubscribeStream>, Status> {
+        let addr = request.remote_addr().unwrap().to_string();
         let qid = request.into_inner().queue_id;
-        println!("Subscribe called for queue_id={}", qid);
+        let sub_id = format!("{}_{}", qid, addr);
+        println!("Subscribe called for queue_id={} from {}", qid, addr);
 
         let (tx, rx) = tokio::sync::mpsc::channel(4);
 
-        tokio::spawn(async move {
-            for i in 1..=5 {
-                let msg = QueueMessage {
-                    queue_id: qid.clone(),
-                    message: format!("Update {} for queue {}", i, qid).into_bytes(),
-                };
-                if let Err(e) = tx.send(Ok(msg)).await {
-                    println!("subscriber dropped: {}", e);
-                    return;
-                }
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-        });
+        let subscriber = Subscriber {
+            tx,
+            last_heartbeat: std::time::SystemTime::now(),
+            lag: 0,
+        };
+        self.subscribers.add_subscriber(sub_id, subscriber).await;
 
         Ok(Response::new(ReceiverStream::new(rx)))
     }
@@ -57,8 +64,13 @@ impl QueueBridgeBalancer for MyQueueBridge {
         &self,
         request: Request<HeartbeatRequest>,
     ) -> Result<Response<EmptyResponse>, Status> {
+        let addr = request.remote_addr().unwrap().to_string();
         let req = request.into_inner();
-        println!("Heartbeat: queue_id={}, lag={}", req.queue_id, req.lag);
+        for item in req.queue_lags {
+            let sub_id = format!("{}_{}", item.queue_id, addr);
+            self.subscribers.update_heartbeat(&sub_id, item.lag).await;
+        }
+
         Ok(Response::new(EmptyResponse {}))
     }
 }

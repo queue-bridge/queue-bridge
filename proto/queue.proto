@@ -20,7 +20,11 @@ message QueueMessage {
   bytes message = 2;
 }
 
-message HeartbeatRequest {
+message QueueLag {
   string queue_id = 1;
   int64 lag = 2;
+}
+
+message HeartbeatRequest {
+  repeated QueueLag queue_lags = 1;
 }
