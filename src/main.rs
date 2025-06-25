@@ -66,7 +66,7 @@ impl QueueBridgeBalancer for MyQueueBridge {
     ) -> Result<Response<EmptyResponse>, Status> {
         let addr = request.remote_addr().unwrap().to_string();
         let req = request.into_inner();
-        for item in req.queue_lags {
+        for item in &req.queue_lags {
             let sub_id = format!("{}_{}", item.queue_id, addr);
             self.subscribers.update_heartbeat(&sub_id, item.lag).await;
         }
