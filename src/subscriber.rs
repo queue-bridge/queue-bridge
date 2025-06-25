@@ -35,15 +35,22 @@ impl SubscriberMap {
         drop(subscribers);
 
         if let Some((k, tx)) = selected_subscriber {
-          if tx.is_closed() {
-              let mut subscribers = self.subscribers.lock().await;
-              subscribers.remove(&k);
-              return Err(Status::internal("connection closed."));
-          }
+            if tx.is_closed() {
+                let mut subscribers = self.subscribers.lock().await;
+                subscribers.remove(&k);
+                return Err(Status::internal("connection closed."));
+            }
 
-          if let Err(e) = tx.send(Ok(msg)).await {
-              return Err(Status::internal(format!("send message failed, {}", e)));
-          }
+            if let Err(e) = tx.send(Ok(msg)).await {
+                return Err(Status::internal(format!("send message failed, {}", e)));
+            }
+
+            let mut subscribers = self.subscribers.lock().await;
+            if let Some(sub) = subscribers.get_mut(&k) {
+                sub.lag += 10;
+            }
+
+            return Ok(Response::new(EmptyResponse {}));
         }
 
         return Err(Status::not_found("No available node."));
