@@ -22,6 +22,17 @@ impl SubscriberMap {
     }
 
     pub async fn push_message(&self, msg: QueueMessage) -> Result<Response<EmptyResponse>, Status> {
+        for _ in 0..3 {
+            let res = self.push_message_internal(msg.clone()).await;
+            if res.is_ok() {
+                return res;
+            }
+        }
+
+        return Err(Status::internal("push message failed"));
+    }
+
+    async fn push_message_internal(&self, msg: QueueMessage) -> Result<Response<EmptyResponse>, Status> {
         let queue_id = msg.queue_id.clone();
         let subscribers = self.subscribers.lock().await;
 
