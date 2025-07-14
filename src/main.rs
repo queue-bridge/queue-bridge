@@ -7,7 +7,7 @@ pub mod queuebridge {
 
 use queuebridge::{
     queue_bridge_balancer_server::{QueueBridgeBalancer, QueueBridgeBalancerServer},
-    EmptyResponse, SubscribeRequest, QueueMessage, HeartbeatRequest,
+    EmptyResponse, SubscribeRequest, QueueMessage, PushBatchRequest, HeartbeatRequest,
 };
 
 mod subscriber;
@@ -36,6 +36,19 @@ impl QueueBridgeBalancer for MyQueueBridge {
         let msg = request.into_inner();
         // println!("Push called for queue_id={}", msg.queue_id);
         return self.subscribers.push_message(msg).await;
+    }
+
+    async fn push_batch(
+        &self,
+        request: Request<PushBatchRequest>,
+    ) -> Result<Response<EmptyResponse>, Status> {
+        let req = request.into_inner();
+        // println!("Push called for queue_id={}", msg.queue_id);
+        for msg in req.messages {
+            self.subscribers.push_message(msg).await?;
+        }
+
+        Ok(Response::new(EmptyResponse { }))
     }
 
     async fn subscribe(
