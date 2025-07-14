@@ -34,7 +34,7 @@ impl QueueBridgeBalancer for MyQueueBridge {
         request: Request<QueueMessage>,
     ) -> Result<Response<EmptyResponse>, Status> {
         let msg = request.into_inner();
-        println!("Push called for queue_id={}", msg.queue_id);
+        // println!("Push called for queue_id={}", msg.queue_id);
         return self.subscribers.push_message(msg).await;
     }
 
