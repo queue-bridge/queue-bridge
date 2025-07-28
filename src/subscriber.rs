@@ -63,6 +63,7 @@ impl SubscriberMap {
         if !keys_to_remove.is_empty() {
             let mut subscribers = self.subscribers.lock().await;
             for k in keys_to_remove {
+                println!("Disconnected: {k}");
                 subscribers.remove(&k);
             }
         }
